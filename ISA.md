@@ -97,7 +97,7 @@ After a function call, this register points to the instruction directly after th
 
 ### `gpr[16]`: General purpose registers (16, 64-bit)
 
-These registers are used to store data, and are the arguments for arithmetic operations. Often, `gpr[x]` is denoted `rx`; for example, `r4`.
+These registers are used to store data, and are the arguments for arithmetic operations. Often, `gpr[x]` is denoted `rx`; for example, `r4` refers to `gpr[4]`.
 
 ## Calling convention
 
@@ -115,7 +115,7 @@ The register `r14` is used as the stack pointer. The stack grows downwards, and 
     29 .. .. | mf r9
     be 08 00 | st r14, 8
 
-See section "Reserved registers" for additional notes.
+See section "Reserved registers" in DESIGN.md for additional notes.
 
 ### Function calls
 

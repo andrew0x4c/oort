@@ -15,7 +15,7 @@ The `jump` and `call` instructions differ only by the `0x10` bit, so writing `ne
 
 ## Reserved registers
 
-We chose the "high" registers to be reserved for similarity to real architectures. For example, ARM treats its `R13` (from `R0` to `R15`) as the stack pointer `SP`, and MIPS treats its `$29` (from `$0` to $31`) as the stack pointer `$sp`.
+We chose the "high" registers to be reserved for similarity to real architectures. For example, ARM treats its `R13` (from `R0` to `R15`) as the stack pointer `SP`, and MIPS treats its `$29` (from `$0` to `$31`) as the stack pointer `$sp`.
 
 The global pointer corresponds to the TOC in PowerPC. Note that the purpose of pointing to the center of the table is because if the table starts from offset 0, the memory offset overflows after 4096 8-byte entries (only 32K); however, starting from offset -32768, the table can contain 8192 8-byte entries (the full 64K).
 
