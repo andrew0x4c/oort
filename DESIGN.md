@@ -106,12 +106,16 @@ which, while strange, are sometimes useful. (For example, the first one might be
 
 The result of all shift operations is placed in the accumulator. This is to make it easier to extract multiple bitfields, which can be done by leaving the value in `sr`, and using `shl` and `shr` multiple times.
 
+Using a designated shift register could potentially allow for optimizations by placing `sr` physically closer to the shifter.
+
+Actually, the original reason for using `sr` for shifts was that space for instructions was running low after encoding the other instructions, so we couldn't fit 16 or 32 shift instructions like with the arithmetic instructions. Encoding shift instructions also has the issue that unlike the arithmetic instructions, the shift instructions are not commutative, so one would need to choose if the shift amount is the register or `acc`. For example, a C-style `x << y` might work better with `acc` as the shift amount by moving `x` into a register first, but if `y` was already stored in a register, having the register be the shift amount might work better.
+
 ## `test`
 
 The values of 0 and -1 were chosen to make it easier to use the result of a test as a mask. For example, we can conditionally add a value in constant time as follows:
 
     28 .. .. | mf r8
-    11 .. .. | testz
+    11 .. .. | test $z
     49 .. .. | and r9
     7a .. .. | add r10
     3a .. .. | mt r10

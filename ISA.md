@@ -47,9 +47,9 @@
         bit 2: swap 16-bit chunks
         bit 3: swap 32-bit chunks
     Calling convention
-        r0-r7, lr: caller-saved
-        r8-r15, sr, acc: callee-saved
-        arguments: r0-r4, then stack
+        r0-r7, sr, acc: caller-saved
+        r8-r15, lr: callee-saved / "preserved"
+        arguments: r0-r3, then stack
         return values:
                   b <=  64: acc
              64 < b <= 256: r0-r3
@@ -108,7 +108,7 @@ The register `r15` is used to point to a table consisting of global symbols such
 The register `r14` is used as the stack pointer. The stack grows downwards, and the value at `r14` is always the last pushed item. Because there is no specific push instruction, a push is emulated by manually adjusting `r14`. For example, this instruction sequence pushes r8 and r9 to the stack:
 
     2e .. .. | mf r14
-    f3 f0 ff | addi -16
+    f3 f0 ff | addi $111x, -16
     3e .. .. | mt r14
     28 .. .. | mf r8
     be 00 00 | st r14, 0
@@ -122,10 +122,13 @@ See section "Reserved registers" in DESIGN.md for additional notes.
 A function must preserve the states of the following registers:
 - `r8` through `r15`
 - The link register `lr`
+
 This means that a function is free to change the values of the following registers:
 - `r0` through `r7`
 - The shift register `sr`
 - The accumulator `acc`
+
+Note that `lr` being callee-saved (preserved) means that when a function returns, the return address must be the same as the address `lr`. The only way a function can return to an arbitrary address without `ret` is through `jumpa`; however, if a function uses `jumpa` to return, it can't control what it returns in `acc`. Thus, it is recommended that functions always return with `ret`, after restoring `lr` if it was pushed onto the stack.
 
 When passing arguments, the first four arguments are stored in registers `r0` through `r3`. Subsequent arguments are pushed onto the stack in reverse order (so the stack pointer points to the fifth argument).
 
@@ -179,7 +182,7 @@ Certain 3-byte instructions interpret IMM as a signed 64-bit value, SIMM. In oth
 
 ### XIMM: Extended immediate
 
-Certain 3-byte instructions (`cx`, `dx`, `ex`, `fx`) interpret their argument as options for interpreting the immediate IMM. Given an immediate IMM, it is first extended to 32 bits by padding with bit 0 of the argument. Then, if bit 2 is set, the two 16-bit chunks are swapped. This value is then extended to 64 bits by padding with bit 1 of the argument. Finally, if bit 3 is set, the two 32-bit chunks are swapped. This result is XIMM.
+Certain 3-byte instructions (`cx`, `dx`, `ex`, `fx`) interpret their argument as options for interpreting the immediate IMM. Given an immediate IMM, it is first extended to 32 bits by padding on the left with bit 0 of the argument. Then, if bit 2 is set, the two 16-bit chunks are swapped. This value is then extended to 64 bits by padding on the left with bit 1 of the argument. Finally, if bit 3 is set, the two 32-bit chunks are swapped. This result is XIMM.
 
 See section "XIMM" in DESIGN.md for additional notes.
 
