@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <string.h>
+#include <errno.h>
 
 typedef struct CPU {
     uint8_t* mem;
@@ -133,8 +135,8 @@ void step(CPU* cpu) {
         case 0x5: cpu->acc |= cpu->gpr[arg]; break;
         case 0x6: cpu->acc ^= cpu->gpr[arg]; break;
         case 0x7: cpu->acc += cpu->gpr[arg]; break;
-        case 0x8:                    if(cond) next_pc += simm; break;
-        case 0x9: cpu->lr = next_pc; if(cond) next_pc += simm; break;
+        case 0x8: if(cond) {                    next_pc += simm; } break;
+        case 0x9: if(cond) { cpu->lr = next_pc; next_pc += simm; } break;
         case 0xA: cpu->acc = get_u64(cpu->mem, cpu->gpr[arg] + simm); break;
         case 0xB: set_u64(cpu->mem, cpu->gpr[arg] + simm, cpu->acc); break;
         case 0xC: cpu->acc &= ximm; break;
@@ -153,7 +155,7 @@ void loop(CPU* cpu) {
 uint64_t str_to_u64(char* ptr) {
     // atol clamps, I like wraparound
     uint64_t acc = 0;
-    while(*ptr) {
+    while('0' <= *ptr && *ptr <= '9') {
         acc = acc * 10 + (*ptr - '0');
         ptr++;
     }
@@ -191,63 +193,42 @@ void dump(CPU* cpu) {
     printf("*** end CPU state ***\n");
 }
 
+#define ERR_MSG ": [Errno %d] %s\n"
+#define ERR_ARGS errno, strerror(errno)
+#define ERR(msg, ...) do { \
+        printf(msg, ##__VA_ARGS__); exit(1); \
+    } while(0)
+#define ERRINFO(msg, ...) ERR(msg ERR_MSG, ##__VA_ARGS__, ERR_ARGS)
+// https://stackoverflow.com/questions/5891221
+
 int main(int argc, char** argv) {
-    char* fn = argv[1];
-    uint64_t memsize = str_to_u64(argv[1]);
+    uint64_t memsize = 65536;
+    char* infilename = NULL;
+    for(int i = 0; i < argc; i++) {
+        if(strcmp("--memsize", argv[i]) == 0) {
+            i++;
+            memsize = str_to_u64(argv[i]);
+        } else if(strcmp("--infile", argv[i]) == 0) {
+            i++;
+            infilename = argv[i];
+        }
+    }
+
     memsize = ((memsize - 1) | 7) + 1; // round up to multiple of 8
     uint8_t* mem = calloc(memsize, sizeof(uint8_t));
+
+    if(infilename == NULL) ERR("No input file given\n");
+    FILE* infile = fopen(infilename, "r");
+    if(infile == NULL) ERRINFO("Failed to open file '%s'", infilename);
+    {
+        size_t amt = fread(mem, 1, memsize, infile);
+        if(!feof(infile)) ERRINFO("Error reading file '%s'", infilename);
+    }
+
     CPU* cpu = new_CPU(mem);
-    // the assembly language isn't yet set in stone,
-    // this was just some testing code
-    cpu->mem[0] = 0x1F; // test $zpmn
-    cpu->mem[1] = 0x35; // mt r5
-    cpu->mem[2] = 0x10; // test 0
-    cpu->mem[3] = 0xF9; // addi $1x00, 0x6942
-    cpu->mem[4] = 0x42;
-    cpu->mem[5] = 0x69;
-    cpu->mem[6] = 0x10; // test 0
-    cpu->mem[7] = 0xE0; // xori $000x, 4096
-    cpu->mem[8] = 0x00;
-    cpu->mem[9] = 0x10;
-    cpu->mem[10] = 0x38; // mt r8
-    cpu->mem[11] = 0x29; // mf r9
-    cpu->mem[12] = 0xF0; // addi $000x, 0x47
-    cpu->mem[13] = 0x47;
-    cpu->mem[14] = 0x00;
-    cpu->mem[15] = 0x39; // mt r9
-    cpu->mem[16] = 0x28; // mf r8
-    cpu->mem[17] = 0xF3; // addi $111x, 0xFF
-    cpu->mem[18] = 0xFF;
-    cpu->mem[19] = 0xFF;
-    cpu->mem[20] = 0x82; // jump $p, -13
-    cpu->mem[21] = -13;
-    cpu->mem[22] = 0xFF;
-    cpu->mem[23] = 0x29; // mf r9
-    cpu->mem[24] = 0xBF; // st r15, 0x100
-    cpu->mem[25] = 0x00;
-    cpu->mem[26] = 0x01;
-    cpu->mem[27] = 0x10; // test 0
-    cpu->mem[28] = 0xD0; // ori $000x, 0x2301
-    cpu->mem[29] = 0x01;
-    cpu->mem[30] = 0x23;
-    cpu->mem[31] = 0xD4; // ori $00x0, 0x6745
-    cpu->mem[32] = 0x45;
-    cpu->mem[33] = 0x67;
-    cpu->mem[34] = 0xD8; // ori $0x00, 0xAB89
-    cpu->mem[35] = 0x89;
-    cpu->mem[36] = 0xAB;
-    cpu->mem[37] = 0xDC; // ori $x000, 0xEFCD
-    cpu->mem[38] = 0xCD;
-    cpu->mem[39] = 0xEF;
-    cpu->mem[40] = 0xBF; // st r15, 0x207
-    cpu->mem[41] = 0x07;
-    cpu->mem[42] = 0x02;
-    cpu->mem[43] = 0x0F; // halt
     dump(cpu);
     loop(cpu);
     dump(cpu);
-    printf("mem:"); info_mem(cpu->mem, 0x100);
-    printf("mem:"); info_mem(cpu->mem, 0x200);
     printf("mem:"); info_mem(cpu->mem, 0x000);
     printf("mem:"); info_mem(cpu->mem, 0x010);
     printf("mem:"); info_mem(cpu->mem, 0x020);

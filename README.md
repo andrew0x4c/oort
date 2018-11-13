@@ -15,7 +15,15 @@ To build the emulator, just run
 
     make
 
-Note that the emulator runs a fixed program for testing purposes for now.
+To run the emulator, use
+
+    ./emu --infile file [--memsize size]
+
+The command `xxd -r -p` to convert from raw hex to binary may be useful; for example:
+
+    echo f010320f | xxd -r -p | ./emu --infile /dev/stdin
+
+Currently, the emulator just dumps the state of the processor before and after running.
 
 ## Roadmap
 
