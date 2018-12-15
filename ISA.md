@@ -2,51 +2,29 @@
 
 ## Cheat sheet
 
-    All instructions
-        0x: (misc)
-        1x: test cond
-        2x: mf reg
-        3x: mt reg
-        4x: and reg
-        5x: or reg
-        6x: xor reg
-        7x: add reg
-        8x: jump cond, offset
-        9x: call cond, offset
-        ax: ld reg, offset
-        bx: st reg, offset
-        cx: andi mode, data
-        dx: ori mode, data
-        ex: xori mode, data
-        fx: addi mode, data
-    0x0* instructions
-        00: null
-        01: trace
-        02: sys
-        03: ext
-        04: mfsr
-        05: mtsr
-        06: shl
-        07: shr
-        08: jumpa
-        09: calla
-        0a: ret
-        0b: nop
-        0c: mflr
-        0d: mtlr
-        0e: pc
-        0f: halt
-    Conditions
-        bit 0: zero
-        bit 1: positive
-        bit 2: minimum
-        bit 3: negative
-    Extended immediates
-        bit 0: fill 16-bit chunk
-        bit 1: fill 32-bit chunk
-        bit 2: swap 16-bit chunks
-        bit 3: swap 32-bit chunks
-    Calling convention
+    All instructions      | 0x0* instructions (tentative)
+    0x: (misc) ---------> | 00: null
+    1x: test cond         | 01: trace
+    2x: mf    reg         | 02: sys
+    3x: mt    reg         | 03: ext
+    4x: and   reg         | 04: mfsr
+    5x: or    reg         | 05: mtsr
+    6x: xor   reg         | 06: shl
+    7x: add   reg         | 07: shr
+    8x: jump cond, offset | 08: jumpa
+    9x: call cond, offset | 09: calla
+    ax: ld    reg, offset | 0a: ret
+    bx: st    reg, offset | 0b: nop
+    cx: andi mode, data   | 0c: mflr
+    dx: ori  mode, data   | 0d: mtlr
+    ex: xori mode, data   | 0e: pc
+    fx: addi mode, data   | 0f: halt
+    Conditions        | Extended immediates
+    bit 0: zero       | bit 0: fill 16-bit chunk
+    bit 1: positive   | bit 1: fill 32-bit chunk
+    bit 2: minimum    | bit 2: swap 16-bit chunks
+    bit 3: negative   | bit 3: swap 32-bit chunks
+    Calling convention (tentative)
         r0-r7, sr, acc: caller-saved
         r8-r15, lr: callee-saved / "preserved"
         arguments: r0-r3, then stack
@@ -73,7 +51,9 @@ Note that `jumpa` and `calla` are `0x08` and `0x09`, while `jump` and `call` are
 
 `ret` is `0x0A`. This is because `0x0A` is newline, which you get by pressing "return". (Unfortunately I can't take credit for this; I saw a blog post on something similar.)
 
-`halt` is `0x0F`. `halt` is the last thing your program does, and `0x0F` is the last misc instruction.
+(Tentative) `halt` is `0x0F`. `halt` is the last thing your program does, and `0x0F` is the last misc instruction.
+
+TODO: see note in section on `halt` instruction. Possibly I might rearrange some of the `0x0*` instructions later.
 
 ## Registers
 
@@ -130,9 +110,11 @@ This means that a function is free to change the values of the following registe
 
 Note that `lr` being callee-saved (preserved) means that when a function returns, the return address must be the same as the address `lr`. The only way a function can return to an arbitrary address without `ret` is through `jumpa`; however, if a function uses `jumpa` to return, it can't control what it returns in `acc`. Thus, it is recommended that functions always return with `ret`, after restoring `lr` if it was pushed onto the stack.
 
-When passing arguments, the first four arguments are stored in registers `r0` through `r3`. Subsequent arguments are pushed onto the stack in reverse order (so the stack pointer points to the fifth argument).
+(Tentative) When passing arguments, the first four arguments are stored in registers `r0` through `r3`. Subsequent arguments are pushed onto the stack in reverse order (so the stack pointer points to the fifth argument).
 
-If the return value fits inside 64 bits, it should be placed in `acc`. If the return value doesn't fit inside 64 bits, but fits inside 256 bits, it should be placed in registers `r0` through `r3`. Otherwise, the caller function should place in `r7` a pointer representing the memory where the return value should be placed, and the callee function should write the return values there.
+(Tentative) If the return value fits inside 64 bits, it should be placed in `acc`. If the return value doesn't fit inside 64 bits, but fits inside 256 bits, it should be placed in registers `r0` through `r3`. Otherwise, the caller function should place in `r7` a pointer representing the memory where the return value should be placed, and the callee function should write the return values there.
+
+TODO: due to this calling convention, the conditional call instructions are currently not that useful; why move your arguments into `r0` through `r3` if you aren't sure you will call the function? Also, there is some asymmetry between the input and outputs. For example, some calling conventions return the first argument "by default". Finally, if a function treats a large argument as an array, it would save instructions if it didn't need to store the data back into memory.
 
 The global pointer and stack pointer must always be aligned at 8 bytes on a function call. A function can assume that this is always true.
 
@@ -302,6 +284,8 @@ This instruction is useful for performing PC-relative addressing, without using 
     halt()
 
 Halts the processor.
+
+TODO: `halt` should definitely be a supervisor-mode instruction, like in x86; a regular user program shouldn't be able to run it. For example, in x86 it causes an exception. Maybe move it to one of the special instructions, or `ext`? This way the only instructions which are intended for supervisor mode are `0x00` to `0x03`.
 
 ### `1x: test cond`; Test for condition
 

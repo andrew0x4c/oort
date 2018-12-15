@@ -32,9 +32,11 @@ This is also why we don't pass any information in `acc` for function calls.
 
 ## Function calls
 
-We leave `r4` through `r7` as temporaries, but don't use them for arguments, in case a function needs temporary storage at the start or directly after a function call. Also, we try to return values in `acc` because the caller may immediately use the result (requiring 0 moves), or move it to a register (requiring 1 move). If we always return in `r0`, which requires a move in the callee, the caller may immediately use the result (requiring 2 moves), or move it to a register (requiring 1 move). However, we do not do this for multiple-word return values, since only one word can be in `acc`, which may not be what the caller wants to use first. 
+(Tentative) We leave `r4` through `r7` as temporaries, but don't use them for arguments, in case a function needs temporary storage at the start or directly after a function call. Also, we try to return values in `acc` because the caller may immediately use the result (requiring 0 moves), or move it to a register (requiring 1 move). If we always return in `r0`, which requires a move in the callee, the caller may immediately use the result (requiring 2 moves), or move it to a register (requiring 1 move). However, we do not do this for multiple-word return values, since only one word can be in `acc`, which may not be what the caller wants to use first.
 
-For very large return values, the reason `r7` is used as the return address instead of `r4`, is so we can consistently treat `r4` as the first temporary register, `r5` as the second, and so on. Also, unlike some calling conventions which pass this pointer as an argument, we use a separate register so we can consistently treat `r0` as the first argument register, `r1` as the second, and so on.
+(Tentative) For very large return values, the reason `r7` is used as the return address instead of `r4`, is so we can consistently treat `r4` as the first temporary register, `r5` as the second, and so on. Also, unlike some calling conventions which pass this pointer as an argument, we use a separate register so we can consistently treat `r0` as the first argument register, `r1` as the second, and so on.
+
+TODO: see note in ISA.md on function calls.
 
 ## Memory
 
