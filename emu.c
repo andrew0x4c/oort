@@ -204,6 +204,8 @@ void dump(CPU* cpu) {
 int main(int argc, char** argv) {
     uint64_t memsize = 65536;
     char* infilename = NULL;
+    bool use_steps = false;
+    uint64_t num_steps = 0;
     for(int i = 0; i < argc; i++) {
         if(strcmp("--memsize", argv[i]) == 0) {
             i++;
@@ -211,6 +213,10 @@ int main(int argc, char** argv) {
         } else if(strcmp("--infile", argv[i]) == 0) {
             i++;
             infilename = argv[i];
+        } else if(strcmp("--steps", argv[i]) == 0) {
+            i++;
+            use_steps = true;
+            num_steps = str_to_u64(argv[i]);
         }
     }
 
@@ -227,7 +233,11 @@ int main(int argc, char** argv) {
 
     CPU* cpu = new_CPU(mem);
     dump(cpu);
-    loop(cpu);
+    if(use_steps) {
+        for(uint64_t i = 0; i < num_steps; i++) step(cpu);
+    } else {
+        loop(cpu);
+    }
     dump(cpu);
     printf("mem:"); info_mem(cpu->mem, 0x000);
     printf("mem:"); info_mem(cpu->mem, 0x010);
