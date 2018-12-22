@@ -109,6 +109,7 @@ void step(CPU* cpu) {
     uint64_t next_pc = cpu->pc + len;
     switch(op) {
         case 0x0: {
+            uint64_t old_lr = cpu->lr;
             switch(arg) {
                 case 0x0: on_null(cpu); break;
                 case 0x1: on_trace(cpu); break;
@@ -120,12 +121,12 @@ void step(CPU* cpu) {
                 case 0x7: cpu->acc = cpu->sr >> cpu->acc; break;
                 case 0x8:                    next_pc = cpu->acc; break;
                 case 0x9: cpu->lr = next_pc; next_pc = cpu->acc; break;
-                case 0xA: next_pc = cpu->lr; break;
-                case 0xB: break;
+                case 0xA:                    next_pc = old_lr; break;
+                case 0xB: cpu->lr = next_pc; next_pc = old_lr; break;
                 case 0xC: cpu->acc = cpu->lr; break;
                 case 0xD: cpu->lr = cpu->acc; break;
                 case 0xE: cpu->acc = next_pc; break;
-                case 0xF: cpu->halt = 1; break;
+                case 0xF: break;
             }
         }; break;
         case 0x1: cpu->acc = -cond; break;

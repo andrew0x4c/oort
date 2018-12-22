@@ -5,20 +5,20 @@
     All instructions      | 0x0* instructions (tentative)
     0x: (misc) ---------> | 00: null
     1x: test cond         | 01: trace
-    2x: mf    reg         | 02: sys
-    3x: mt    reg         | 03: ext
-    4x: and   reg         | 04: mfsr
-    5x: or    reg         | 05: mtsr
-    6x: xor   reg         | 06: shl
-    7x: add   reg         | 07: shr
+    2x: mf   reg          | 02: sys
+    3x: mt   reg          | 03: ext
+    4x: and  reg          | 04: mfsr
+    5x: or   reg          | 05: mtsr
+    6x: xor  reg          | 06: shl
+    7x: add  reg          | 07: shr
     8x: jump cond, offset | 08: jumpa
     9x: call cond, offset | 09: calla
-    ax: ld    reg, offset | 0a: ret
-    bx: st    reg, offset | 0b: nop
+    ax: ld   reg , offset | 0a: ret
+    bx: st   reg , offset | 0b: retl
     cx: andi mode, data   | 0c: mflr
     dx: ori  mode, data   | 0d: mtlr
     ex: xori mode, data   | 0e: pc
-    fx: addi mode, data   | 0f: halt
+    fx: addi mode, data   | 0f: nop
     Conditions        | Extended immediates
     bit 0: zero       | bit 0: fill 16-bit chunk
     bit 1: positive   | bit 1: fill 32-bit chunk
@@ -49,11 +49,9 @@ The next eight instructions relate to program flow.
 
 Note that `jumpa` and `calla` are `0x08` and `0x09`, while `jump` and `call` are `0x8*` and `0x9*`.
 
-`ret` is `0x0A`. This is because `0x0A` is newline, which you get by pressing "return". (Unfortunately I can't take credit for this; I saw a blog post on something similar.)
+`ret` is `0x0a`. This is because `0x0a` is newline, which you get by pressing "return". (Unfortunately I can't take credit for this; I saw a blog post on something similar.)
 
-(Tentative) `halt` is `0x0F`. `halt` is the last thing your program does, and `0x0F` is the last misc instruction.
-
-TODO: see note in section on `halt` instruction. Possibly I might rearrange some of the `0x0*` instructions later.
+While the `retl` instruction doesn't have an obvious use and needs to be implemented carefully in an emulator, it fits the pattern of the previous 3 instructions which might reduce the size of the circuit.
 
 ## Registers
 
@@ -253,11 +251,15 @@ The address of next instruction is stored in the link register, and execution co
 
 Execution continues at the address given by the value in the link register.
 
-#### `0b: nop`; No operation
+#### `0b: retl`; Return and link
 
-    // no operation
+    old_lr = lr
+    lr = next_pc
+    next_pc = lr
 
-Nothing happens.
+The address of next instruction is stored in the link register, and execution continues at the address given by the value in the link register (before the store).
+
+One use of `retl` may be some version of coroutines, "bouncing" back and forth between two functions.
 
 #### `0c: mflr`; Move from link register
 
@@ -279,13 +281,11 @@ Writes the address of the next instruction into the accumulator.
 
 This instruction is useful for performing PC-relative addressing, without using the call, copy return address, and update stack / link register trick, as this trick may negatively impact branch prediction.
 
-#### `0f: halt`; Halt
+#### `0f: nop`; Nop operation
 
-    halt()
+    // no operation
 
-Halts the processor.
-
-TODO: `halt` should definitely be a supervisor-mode instruction, like in x86; a regular user program shouldn't be able to run it. For example, in x86 it causes an exception. Maybe move it to one of the special instructions, or `ext`? This way the only instructions which are intended for supervisor mode are `0x00` to `0x03`.
+Nothing happens.
 
 ### `1x: test cond`; Test for condition
 
