@@ -281,7 +281,7 @@ Writes the address of the next instruction into the accumulator.
 
 This instruction is useful for performing PC-relative addressing, without using the call, copy return address, and update stack / link register trick, as this trick may negatively impact branch prediction.
 
-#### `0f: nop`; Nop operation
+#### `0f: nop`; No operation
 
     // no operation
 
