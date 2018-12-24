@@ -24,14 +24,11 @@
     bit 1: positive   | bit 1: fill 32-bit chunk
     bit 2: minimum    | bit 2: swap 16-bit chunks
     bit 3: negative   | bit 3: swap 32-bit chunks
-    Calling convention (tentative)
-        r0-r7, sr, acc: caller-saved
-        r8-r15, lr: callee-saved / "preserved"
-        arguments: r0-r3, then stack
-        return values:
-                  b <=  64: acc
-             64 < b <= 256: r0-r3
-            256 < b       : *r7
+    Calling convention
+        caller-saved: r0-r7, sr, acc
+        callee-saved: r8-r15, lr ("preserved")
+        arguments:     if possible r0-r3, otherwise *r0
+        return values: if possible r4-r7, otherwise *r4
 
 ### Mnemonics
 
@@ -108,11 +105,19 @@ This means that a function is free to change the values of the following registe
 
 Note that `lr` being callee-saved (preserved) means that when a function returns, the return address must be the same as the address `lr`. The only way a function can return to an arbitrary address without `ret` is through `jumpa`; however, if a function uses `jumpa` to return, it can't control what it returns in `acc`. Thus, it is recommended that functions always return with `ret`, after restoring `lr` if it was pushed onto the stack.
 
-(Tentative) When passing arguments, the first four arguments are stored in registers `r0` through `r3`. Subsequent arguments are pushed onto the stack in reverse order (so the stack pointer points to the fifth argument).
+When passing arguments, look at the number (size) of the arguments. If there are at most 4 arguments or they fit in in 256 bits, they are passed in registers `r0` through `r3`. Otherwise, the arguments are stored in memory (with earlier arguments having lower addresses), with `r0` a pointer to the start of the arguments. This includes the case where there are a variable number of arguments. The pointer `r0` must be 8-byte aligned.
 
-(Tentative) If the return value fits inside 64 bits, it should be placed in `acc`. If the return value doesn't fit inside 64 bits, but fits inside 256 bits, it should be placed in registers `r0` through `r3`. Otherwise, the caller function should place in `r7` a pointer representing the memory where the return value should be placed, and the callee function should write the return values there.
+If an argument is less than 64 bits (such as when passing an 8-bit value), the full 64 bits are used, and the unused bits should be ignored by the callee. If an argument is more than 64 bits (such as when passing a pair of 64-bit values), it is padded to the nearest multiple of 64-bits. This means that each argument is aligned at a 64-bit boundary, which is a register if the arguments are passed in registers.
 
-TODO: due to this calling convention, the conditional call instructions are currently not that useful; why move your arguments into `r0` through `r3` if you aren't sure you will call the function? Also, there is some asymmetry between the input and outputs. For example, some calling conventions return the first argument "by default". Finally, if a function treats a large argument as an array, it would save instructions if it didn't need to store the data back into memory.
+Example:
+- `void f(uint64_t a)`: `a` stored in `r0`
+- `void f(uint8_t a, int32_t b)`: `a` stored in low 8 bits of `r0`, `b` stored in low 32 bits of `r1`
+- `void f(uint64_t a, uint64_t b, uint64_t c, uint64_t d)`: `a` stored in `r0`, `b` stored in `r1`, `c` stored in `r2`, `d` stored in `r3`
+- `void f(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e)`: `a` stored in `*(r0 + 0x00)`, `b` stored in `*(r0 + 0x08)`, `c` stored in `*(r0 + 0x10)`, `c` stored in `*(r0 + 0x18)`, `e` stored in `*(r0 + 0x20)`
+- If we have `struct St { uint32_t x; int8_t y; }`; `void f(St a, uint8_t b)`: `a.x` stored in low 32 bits of `r0`, `a.y` stored in next 8 bits of `r0`, `b` stored in low 8 bits of `r1`.
+- If we have `struct St { uint64_t x; int64_t y; }`; `void f(St a, uint64_t b)`: `a.x` stored in `r0`, `a.y` stored in `r1`, `b` stored in `r2`.
+
+Return values are analogous to arguments but with registers `r4` through `r7` instead of `r0` through `r3`. Note that in the many-return-value case, the caller passes the pointer in `r4`, not the callee. Also, memory allocated for the return value (`*r4`) should not overlap with memory allocated for the arguments (`*r0`).
 
 The global pointer and stack pointer must always be aligned at 8 bytes on a function call. A function can assume that this is always true.
 

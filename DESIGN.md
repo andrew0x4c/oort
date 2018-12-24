@@ -32,11 +32,17 @@ This is also why we don't pass any information in `acc` for function calls.
 
 ## Function calls
 
-(Tentative) We leave `r4` through `r7` as temporaries, but don't use them for arguments, in case a function needs temporary storage at the start or directly after a function call. Also, we try to return values in `acc` because the caller may immediately use the result (requiring 0 moves), or move it to a register (requiring 1 move). If we always return in `r0`, which requires a move in the callee, the caller may immediately use the result (requiring 2 moves), or move it to a register (requiring 1 move). However, we do not do this for multiple-word return values, since only one word can be in `acc`, which may not be what the caller wants to use first.
+An early method of passing return values had 3 cases, depending on the size of the output. It was intended to reduce register-register and register-memory transfers, but was quite inelegant. (Also, reg-reg moves in modern CPU designs are very cheap, so the only cost would be code size.)
 
-(Tentative) For very large return values, the reason `r7` is used as the return address instead of `r4`, is so we can consistently treat `r4` as the first temporary register, `r5` as the second, and so on. Also, unlike some calling conventions which pass this pointer as an argument, we use a separate register so we can consistently treat `r0` as the first argument register, `r1` as the second, and so on.
+Additionally, I wanted to minimize moves when passing array-like arguments; this precludes passing (or returning) some arguments in registers and some arguments on the stack, as a function which takes an array and an index and returns the given element would require storing the register data back into memory before indexing the array.
 
-TODO: see note in ISA.md on function calls.
+In practice these large arguments are not very common, as we usually pass pointers to them. However for "small" structs of length 16 to 32 bytes (such as a point or complex number) passing them around might be useful.
+
+The resulting calling convention is almost perfectly symmetrical between arguments and return values, only differing in which registers are used.
+
+Note that even though it is possible all of `r0` to `r7` are used, this is very uncommon, so typically a few of those registers can be used as temporaries without having to allocate stack space.
+
+Also, because the return registers are different from the argument registers, it is not necessary to copy out `r0` through `r3` before computing the arguments, or save the return values in other registers until the function is finished using the arguments.
 
 ## Memory
 
