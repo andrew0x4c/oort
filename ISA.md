@@ -2,10 +2,10 @@
 
 ## Cheat sheet
 
-    All instructions      | 0x0* instructions (tentative)
+    All instructions      | 0x0* instructions
     0x: (misc) ---------> | 00: null
     1x: test cond         | 01: trace
-    2x: mf   reg          | 02: sys
+    2x: mf   reg          | 02: halt
     3x: mt   reg          | 03: ext
     4x: and  reg          | 04: mfsr
     5x: or   reg          | 05: mtsr
@@ -38,7 +38,7 @@ Load/store instructions are always of the form `0bM01X` (i.e. instructions 2, 3 
 
 This generalizes somewhat to `mflr`, `mtlr`, `mfsr`, `mtsr`: load (`mf*r`) always comes before store (`mt*r`), and they are always the first two instruction in a four-instruction group.
 
-The four instructions which generate exceptions or could otherwise be slow in executing come first (`null`, `trace`, `sys`, `ext`), with `null` being the null byte (`0x00`).
+The four instructions which generate exceptions or could otherwise be slow in executing come first (`null`, `trace`, `halt`, `ext`), with `null` being the null byte (`0x00`). `null` and `trace` are grouped, because in theory, a regular program should not run either, while both `halt` and `ext` are purposely executed. `ext` is last, because it is at the boundary of supervisor-mode and user-mode, as is its opcode.
 
 The four shift-related instructions come next.
 
@@ -197,17 +197,19 @@ Always traps with exception (???). Used for debugging.
 
 This instruction is similar to the INT 3 (`0xCC`) instruction in x86. It is one byte, because if a debugger wants to modify an instruction stream, a one-byte instruction can replace an opcode anywhere, while a multi-byte instruction may overwrite parts of subsequent instructions if the target instruction was shorter than the `trace` instruction.
 
-#### `02: sys`; System action
+#### `02: halt`; Halt
 
-Perform system action. If invalid action is specified, traps with exception (???).
+    halt()
 
-Further extensions to Oort will use `sys` to perform supervisor-level actions, such as writing to devices or controlling virtual memory mappings.
+Halts the processor, until awoken by the next interrupt.
 
 #### `03: ext`; Extension action
 
-Perform extension action. If invalid action is specified, traps with exception (???).
+Perform extension action given in `sr`. If invalid action is specified, traps with exception (???).
 
-Further extensions to Oort will use `ext` to perform user-level actions, such as executing additional instructions.
+Further extensions to Oort will use `ext` to perform both user-level actions, such as executing additional instructions, and supervisor-level actions, such as controlling virtual memory mappings.
+
+"Basic" implementations of Oort may simply halt on any of `null`, `trace`, `halt`, and `ext`.
 
 #### `04: mfsr`; Move from shift register
 

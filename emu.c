@@ -62,10 +62,6 @@ void on_trace(CPU* cpu) {
     printf("\n*** executed trace ***\n");
     cpu->halt = 1;
 }
-void on_sys(CPU* cpu) {
-    printf("\n*** executed sys ***\n");
-    cpu->halt = 1;
-}
 void on_ext(CPU* cpu) {
     printf("\n*** executed ext ***\n");
     cpu->halt = 1;
@@ -113,7 +109,7 @@ void step(CPU* cpu) {
             switch(arg) {
                 case 0x0: on_null(cpu); break;
                 case 0x1: on_trace(cpu); break;
-                case 0x2: on_sys(cpu); break;
+                case 0x2: cpu->halt = 1; break;
                 case 0x3: on_ext(cpu); break;
                 case 0x4: cpu->acc = cpu->sr; break;
                 case 0x5: cpu->sr = cpu->acc; break;
