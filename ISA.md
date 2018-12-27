@@ -443,7 +443,7 @@ Examples:
 
 (Tentative)
 
-##### `0x_0010_xx...`: Data fence
+#### `0x_0010_xx...`: Data fence
 
 (Tentative) Does the same thing as RISC-V's `FENCE` instruction, with the argument bits being (from high to low) PI, PO, PR, PW, SI, SO, SR, SW.
 
@@ -457,7 +457,7 @@ Simple implementations may just fence all operations on any data fence.
 
 Note: I keep this open for further changes since I'm not sure how much atomicity is really needed. For a simple emulator, where all memory accesses and I/O operations are performed immediately, these instructions are entirely unnecessary.
 
-##### `0x_0011...`: Instruction fence
+#### `0x_0011...`: Instruction fence
 
 (Tentative) Does the same thing as RISC-V's `FENCE.I` instruction.
 
