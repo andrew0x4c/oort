@@ -398,3 +398,235 @@ Computes the value in the accumulator bitwise-xor XIMM, and writes the result in
 
 Computes the value in the accumulator plus XIMM, and writes the result into the accumulator.
 
+## Extension actions
+
+Note: this is not yet implemented.
+
+The `ext` instruction is used to add additional functionality to Oort without affecting the instructions already assigned.
+
+### Determining the extension instruction
+
+The extension instruction executed is determined by the value in `sr`.
+
+#### Supervisor
+
+If the highest bit of `sr` is set, the extension is supervisor-level; if the supervisor bit is not set in the configuration register (`asr0`), the extension traps with exception (???). Otherwise, the extension is user-level, and can always be executed.
+
+#### Extension number
+
+When parsing extension instructions, bytes are read "big-endian", starting from the most significant. This is in contrast to regular instructions, which are "little-endian". This makes it easier to sort extension instructions using regular integer comparison.
+
+To account for future additions, extension instructions are encoded with a variable-length encoding.
+- If the first byte is not `0x7f` or `0xff`, the extension number is 2 bytes long.
+- If the first byte is `0x7f` or `0xff`, the extension number is 4 bytes long.
+
+Extension | Info
+--- | ---
+`0x_0000_ZZZZ_ZZZZ_ZZZZ` to `0x_7eff_ZZZZ_ZZZZ_ZZZZ` | User, 2-byte
+`0x_7f00_0000_ZZZZ_ZZZZ` to `0x_7fff_ffff_ZZZZ_ZZZZ` | User, 4-byte
+`0x_8000_ZZZZ_ZZZZ_ZZZZ` to `0x_feff_ZZZZ_ZZZZ_ZZZZ` | Supervisor, 2-byte
+`0x_ff00_0000_ZZZZ_ZZZZ` to `0x_ffff_ffff_ZZZZ_ZZZZ` | Supervisor, 4-byte
+
+While there is a natural extension to 6-byte and 8-byte extensions, such instructions cannot fit into the argument of the check extension extension.
+
+#### Arguments
+
+An extension instruction may take arguments, similar to regular instructions. Arguments to an extension instruction are placed after the extension number, from higher byte to lower bytes. However, an extension instruction may include arguments in the number itself, similarly to the `2x` opcodes (`mf`).
+
+Possible arguments include register numbers, flags, and immediate values.
+
+Examples:
+- The extension instruction with number `0x1234` and arguments `0xe` and `0xf` is encoded as `0x_1234_ef00_0000_0000`.
+- The extension instruction with number `0x7f123456` and argument `0xcdef` is encoded as `0x_7f12_3456_cdef_0000`.
+
+### Extension list
+
+(Tentative)
+
+##### `0x_0010_xx...`: Data fence
+
+(Tentative) Does the same thing as RISC-V's `FENCE` instruction, with the argument bits being (from high to low) PI, PO, PR, PW, SI, SO, SR, SW.
+
+Note that one can easily set all argument bits to 1, to fence all data, using
+
+    10 .. .. | test $never
+    dd 20 00 | ori $x100, 0x0020
+    03 .. .. | ext
+
+Simple implementations may just fence all operations on any data fence.
+
+Note: I keep this open for further changes since I'm not sure how much atomicity is really needed. For a simple emulator, where all memory accesses and I/O operations are performed immediately, these instructions are entirely unnecessary.
+
+##### `0x_0011...`: Instruction fence
+
+(Tentative) Does the same thing as RISC-V's `FENCE.I` instruction.
+
+See note in "Data fence".
+
+#### `0x_002x_...`: Move from auxiliary user register
+
+Writes the value in auxiliary user register `x` into the accumulator.
+
+Auxiliary user registers are labeled `aur0` through `aur15`.
+
+Reserved for extensions which define additional registers to be accessed in user-mode, such as performance counters. Currently all AURs are reserved.
+
+#### `0x_003x_...`: Move to auxiliary user register
+
+Writes the value in the accumulator into auxiliary user register `x`.
+
+Reserved; see "Move from auxiliary user register".
+
+#### `0x_004x_...`: Atomic bitwise AND
+
+First, keeps a copy of the value in `acc` (call it `k`). Then, loads the value in `gpr[x]` into `acc`, and computes `k` bitwise-and `acc` (i.e. the original value of `acc` bitwise-and the value at `gpr[x]`). Finally, stores the result at `gpr[x]`. (Memory rotation still applies.)
+
+TODO: choose which of "atomic operations" and "LL/SC" to keep. The reservation flag for LL/SC might be a bit confusing to implement in an emulator, especially keeping track of which operations lose the reservation (for instance, interrupts).
+
+#### `0x_005x_...`: Atomic bitwise OR
+
+The same as "Atomic AND", but with the operation being bitwise-or.
+
+#### `0x_006x_...`: Atomic bitwise XOR
+
+The same as "Atomic AND", but with the operation being bitwise-xor.
+
+#### `0x_007x_...`: Atomic add
+
+The same as "Atomic AND", but with the operation being addition.
+
+#### `0x_00ax...`: Load-link
+
+Loads the memory at `gpr[x]` into `acc`, and reserves the memory location. (Memory rotation still applies.)
+
+If another processor writes to that memory location (at any rotation), the reservation is lost.
+
+Note that a reserved memory location is always aligned at 8 bytes.
+
+See note in "Atomic bitwise AND".
+
+#### `0x_00bx...`: Store-conditional
+
+If the reservation on the memory at `gpr[x]` still holds, stores `acc` into the memory at `gpr[x]`, and sets `acc` to 0. Otherwise, does not perform the store, and sets `acc` to -1.
+
+Only one layer of LL/SC is needed. In fact, the reservation can even be lost when any memory operation occurs, or when an interrupt occurs.
+
+#### `0x_7fff_ffff_...`: System call
+
+Traps with exception (???).
+
+This instruction is used to call to supervisor-level routines from user mode.
+
+TODO: it might make sense to pass the system call number as an argument to the extension instruction. Of course, an exception handler can already read the data in `sr`, so this would just be a recommendation.
+
+#### `0x_802x_...`: Move from auxiliary supervisor register
+
+Writes the value in auxiliary supervisor register `x` into the accumulator.
+
+Auxiliary supervisor registers are labeled `asr0` through `asr15`.
+
+Reserved for extensions which define additional registers to be accessed in supervisor-mode, such as performance counters. Currently ASRs `asr3` through `asr15` are reserved.
+
+`asr0` is the supervisor flags register (`sfr`).
+
+`asr1` is the interrupt table register (`itr`).
+
+(Tentative) `asr2` is the page fault address register (`pfar`).
+
+#### `0x_803x_...`: Move to auxiliary supervisor register
+
+Writes the value in the accumulator into auxiliary supervisor register `x`.
+
+Reserved; see "Move from auxiliary supervisor register".
+
+#### `0x_8040...`: TLB clear all
+
+Invalidates all entries in the TLB.
+
+#### `0x_805x...`: TLB clear
+
+Invalidates the TLB entry for virtual address `gpr[x]`, if present.
+
+#### `0x_806x...`: TLB get
+
+If the TLB entry for virtual address `gpr[x]` is present, sets `acc` to the corresponding TLB entry; otherwise, sets `acc` to 0. Note that 0 is an invalid value for a TLB entry, so this case can be distinguished from when the entry is present.
+
+#### `0x_807x...`: TLB set
+
+Sets the TLB entry for virtual address `gpr[x]` to `acc`. The eviction algorithm is implementation-defined.
+
+TODO: it may be useful to, instead of using TLB clear, use TLB set with an invalid mapping (such as 0). This saves some instructions, at the cost of increasing the complexity of TLB set.
+
+#### `0x_ffff_ffff_ZZZZ_ZZZZ`: Check extension
+
+If the extension given by the argument is implemented, sets `acc` to -1; otherwise, sets `acc` to 0. Note that only the extension number is considered, so running extension instruction `0x_ffff_ffff_0001_ffff` only checks if extension `0x0001` is implemented, not if the argument `0xffff` is valid.
+
+Note that a check extension instruction can be created with the same length code as the extension instruction itself. For example, to run extension `0x1234`, one can use
+
+    10 .. .. | test $never
+    dc 34 12 | ori $x000, 0x1234
+    03 .. .. | ext
+
+and to check extension `0x1234`, one can use
+
+    10 .. .. | test $never
+    d6 34 12 | ori $11x0, 0x1234
+    03 .. .. | ext
+
+## Interrupts
+
+Note: this is not yet implemented.
+
+There are 256 possible interrupts.
+
+When the processor receives an interrupt n, it finds the nth 16-byte entry of the table. The first 8 bytes are the new value of `pc`. The next 8 bytes are the new value of `asr0` (system flags register).
+
+TODO: what is saved?
+
+Each entry in the interrupt table is 16 bytes. This means that the interrupt table is exactly one page. The interrupt table register does not store the lowest 12 bits; when it is read back, those bits are filled with zeros.
+
+TODO: assign interrupt numbers.
+
+## TLB
+
+Note: this is not yet implemented.
+
+The TLB is implemented as an n-way set-associative cache. For each virtual address `vaddr`, the tag is bits 63 to 16, and the index is bits 15 to 12. This means that there are 16 sets, each with n lines. Implementations are free to vary n, but it is recommended that n is at least 2. Note that this means the TLB can always map a contiguous 64K block of memory.
+
+    TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT IIII0000 00000000
+    33333333 33333333 22222222 22222222 11111111 11111111 00000000 00000000
+    fedcba98 76543210 fedcba98 76543210 fedcba98 76543210 fedcba98 76543210
+
+(Tentative) There is no address-space ID field.
+
+TODO: maybe a 1-bit ASID field (for user vs supervisor mappings) would be helpful for virtualization. Of course, a multi-bit ASID field has some practical advantages, but requires some extra bookkeeping on the software side, since PIDs may not have a direct correspondence with ASIDs.
+
+The entry at a particular mapping contains the physical page address, as well as some configuration bits.
+
+    NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN NNNN1??? 0RWX0RWX
+    33333333 33333333 22222222 22222222 11111111 11111111 00000000 00000000
+    fedcba98 76543210 fedcba98 76543210 fedcba98 76543210 fedcba98 76543210
+
+Bit number | Description
+--- | ---
+11 | Always 1
+10 | Reserved for cache-related flags
+9 | Reserved for cache-related flags
+8 | Reserved for cache-related flags
+7 | Always 0
+6 | Supervisor-readable
+5 | Supervisor-writable
+4 | Supervisor-executable
+3 | Always 0
+2 | User-readable
+1 | User-writable
+0 | User-executable
+
+TODO: if the ASID is used, the separate supervisor and user RWX flags might be unnecessary.
+
+If the processor tries to perform an operation disallowed by the flags, interrupt (???) is raised.
+
+## IO
+
+TODO: IO will likely be memory mapped, without explicit input and output instructions.
+

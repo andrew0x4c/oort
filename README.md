@@ -38,7 +38,7 @@ Not necessarily in order.
   - [ ] Load/store from files nicely
   - [ ] Interact with the program
   - [ ] Manually poke around in memory
-- [ ] Standardize `sys` and `ext` instruction formats
+- [x] Standardize `sys` and `ext` instruction formats
 - [ ] Write spec for I/O (terminal-only for now)
 - [ ] Implement assembler
   - [ ] Standardize assembly
