@@ -132,3 +132,49 @@ If `r8` was 0, we add `r9` to `r10`; else, we don't do anything. Constant time o
 
 Also, as noted in ISA.md, testing the always-false and always-true condition corresponds to unconditionally setting `acc` to 0 or -1.
 
+## Extension instructions
+
+The extension number is in `sr` so a program can easily extract arguments using shift instructions. Some disadvantages of the other methods include:
+- Use `ext` as an instruction prefix for variable length instructions: this breaks the property that an instruction is 3 bytes if the high bit is set, and 1 byte otherwise (which is where Oort gets its name!).
+- Store extension number in a GPR: this breaks the symmetry of the 16 GPRs.
+- Store extension number in `lr`: `lr` really has nothing to do with data, and the `lr`-related instructions (such as `retl`) are useless for an instruction number.
+- Store extension number in `acc`: `acc` might be a good place for a "secondary" argument to an extension instruction;. If `acc` were the extension number, the extension instruction would have to specify what GPR the extension acts on. However, in the current method, we can have instructions act on `acc` directly.
+
+The ordering of the extension instructions was somewhat difficult to arrange nicely. For example, each AUR and ASR was originally grouped with what instructions it related to; however, now they are grouped into 16 `aur` and `asr` registers, like the GPR register file. This is similar to how x86 has the control registers `CR0`, `CR1`, etc.
+
+It might make sense to have a 16-bit `mfasr` and `mtasr` extension instruction and encode the specific `asr` as an argument (and likewise for `aur`), like in RISC architectures like PowerPC and RISC-V. This would mean that two instructions are needed to create a `mfasr` instruction: `ori` the `mfasr` opcode, and `ori` the particular `asr` number. However, there aren't many `asr`s one needs to build a simple OS, so we only use 16 for now, which means that a `mfasr` instruction can be built in one `ori`.
+
+Another subtlety with the ordering is that many extension instructions parallel regular instructions, to make them easier to remember. For example, `mfaur` and `mtaur` correspond to `0x002x` and `0x003x`. Likewise, `mfasr` and `mtasr` correspond to `0x802x` and `0x803x`. Note that this corresponds to `mf` and `mt` being `0x2x` and 0x3x` in regular opcode space. Similarly, compare the atomic arithmetic instructions and accumulator-register arithmetic instructions. Further extension instructions should preserve this behavior.
+
+Check extension `0x_ffff_ffff_...` is a supervisor instruction to allow an operating system (or even hypervisor) to "lie" to the user process about which instructions are supported.
+
+## Interrupts
+
+The interrupt table has 16-byte entries to make the interrupt table be exactly 4K, or one page. This means that the interrupt table can be created from the page allocator, and it is easy to remember the alignment requirements (same as a page). Implementation-wise, this also means that an addition to compute the address of interrupt-related data is not necessary.
+
+## TLB
+
+We chose a software-managed TLB over a hardware-managed TLB. Hardware-managed TLBs have some disadvantages:
+- Extra code is required to traverse the tree (both for an emulator and for an actual circuit), and manipulate the flag bits.
+- There are many flag bits, which are hard to remember.
+- There isn't an elegant tree structure which supports the entire 64-bit address space.
+
+Specifically, having 8-byte pointers results in 48-bit (4-level tree) or 57-bit (5-level tree) address spaces (see x86-64); an exactly 64-bit address space uses only part of the last layer.
+
+A software-managed TLB allows for more flexibility in the paging scheme; a very small OS is free to keep its own data structures, without allocating several pages for a single tree.
+
+The page size of 4K was chosen to match other common systems. (Briefly, I considered a 64K page size, to fit with the 16-bit theme of the instructions.)
+
+There are 4 index bits in an address; this is to align the tag bits at 16-bit boundaries to make them easier to read.
+
+We use a set-associative cache, as other "simple" setups have some disadvantages:
+- Direct mapped: Fast, but often results in false-aliasing issues.
+- Fully-associative: More flexible in terms of memory access, but can be slow to look up.
+
+The last 8 TLB entry bits (supervisor/user read/write/execute) are arranged so they can be read as Linux-style file permissions from the last byte; for example:
+- `0x77`: supervisor and user can do everything
+- `0x64`: supervisor can read and write, user can only read
+- `0x50`: supervisor can read and execute, user cannot do anything
+
+The permissions were designed to ensure that something like the no-execute bit or read-xor-execute model was supported, as well as to avoid the confusion of x86's CR0.WP, which is set if supervisor-level writes to pages marked read-only are disallowed.
+

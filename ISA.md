@@ -519,6 +519,12 @@ This instruction is used to call to supervisor-level routines from user mode.
 
 TODO: it might make sense to pass the system call number as an argument to the extension instruction. Of course, an exception handler can already read the data in `sr`, so this would just be a recommendation.
 
+#### `0x_8010_...`: Hart ID
+
+(Tentative) Writes the ID of the current hardware thread to `acc`.
+
+This is basically the `mhartid` register of RISC-V; however, since it is read only, it doesn't make sense to treat it as a register.
+
 #### `0x_802x_...`: Move from auxiliary supervisor register
 
 Writes the value in auxiliary supervisor register `x` into the accumulator.
@@ -591,6 +597,8 @@ TODO: assign interrupt numbers.
 
 Note: this is not yet implemented.
 
+The TLB is software-managed.
+
 The TLB is implemented as an n-way set-associative cache. For each virtual address `vaddr`, the tag is bits 63 to 16, and the index is bits 15 to 12. This means that there are 16 sets, each with n lines. Implementations are free to vary n, but it is recommended that n is at least 2. Note that this means the TLB can always map a contiguous 64K block of memory.
 
     TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT TTTTTTTT IIII0000 00000000
@@ -628,5 +636,7 @@ If the processor tries to perform an operation disallowed by the flags, interrup
 
 ## IO
 
-TODO: IO will likely be memory mapped, without explicit input and output instructions.
+Note: this is not yet implemented.
+
+TODO: IO will likely be memory mapped, without explicit input and output instructions. In particular, IO devices will likely be mapped starting at `0x_ffff_0000_0000_0000`. To avoid even more hardware details, the first few devices will be "magic"; reads and writes will immediately work without setup.
 
